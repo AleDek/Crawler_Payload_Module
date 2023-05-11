@@ -56,6 +56,7 @@ int main()
    
     // initialize the helper code - just for debugging
     //initHelper();
+    init_uart();
     printf("Start can...\n");//TODO remove
     //printf("cpu freq: %u \n",SystemCoreClock);
     // start the system timer 
@@ -64,7 +65,7 @@ int main()
     // start of CANfestival stack calls
     canInit(CAN_BAUDRATE);              // Initialize the CANopen bus
     initTimer();                        // Start timer for the CANopen stack
-    nodeID = 7;                           // node id can be anything (1-127)
+    nodeID = 9;                           // node id can be anything (1-127)
     setNodeId (&mbed_slave_Data, nodeID);
     // Init the state           
     setState(&mbed_slave_Data, Initialisation);

@@ -26,18 +26,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "DigitalOut.h"
 #include <cstdint>
 
+#define DEBUG_PRINT 0
 /* Servos*/
 #define PROBE_LIFT_SERVO_PIN PA_6
-#define BRUSH_LIFT_SERVO_PIN PA_1 //conflitto uart2
-#define BRUSH_SERVO_PIN      PA_3 //conflitto uart2 ?
+#define BRUSH_LIFT_SERVO_PIN PA_3 //conflitto uart2
+#define BRUSH_SERVO_PIN      PA_1 //conflitto uart2 ?
 /* Digital outputs */
 #define LIGHT_PIN PB_1
 #define LASER_PIN PB_0 // TODO verificare !
 #define FAN_PIN   PA_8
 /* thermal sensor*/
-#define THERM_1_SDA PB_7
+#define THERM_1_SDA PB_7 //front thermal
 #define THERM_1_SCL PB_6
-#define THERM_2_SDA PB_4
+#define THERM_2_SDA PB_4 //rear thermal
 #define THERM_2_SCL PA_7
 
 // make the system speed available for timer configuration
@@ -46,12 +47,12 @@ extern uint32_t SystemCoreClock;
 //servos homing values
 
 const float probe_lift_home =0.0; //pu
-const float probe_lift_up = 1000;
-const float probe_lift_dn = 2000;
+const float probe_lift_up = 1900;
+const float probe_lift_dn = 1000;
 
 const float brush_lift_home =0.0; //pu
-const float brush_lift_up = 1000;
-const float brush_lift_dn = 2000;
+const float brush_lift_up = 2000;
+const float brush_lift_dn = 1000;
 
 const float brush_home = 0.0; //pu
 const float brush_max = 1000;
@@ -77,8 +78,16 @@ DigitalOut light(LIGHT_PIN);
 DigitalOut laser(LASER_PIN);
 DigitalOut fan(FAN_PIN);
 
-uint8_t therm_buffer[19];
-uint8_t serial_buffer[21];
+//thermal sensors
+D6T_8L_09 tmp_fwd(THERM_1_SDA, THERM_1_SCL); // SDA, SCL
+//D6T_8L_09 tmp_bwd(THERM_2_SDA, THERM_2_SCL); // SDA, SCL
+char raw_buff_fwd[19];
+char raw_buff_bwd[19];
+uint8_t serial_buffer[21]; //TBD 40 2 +19+19
+
+float floatbuff[8]; //TODO OVE test only
+float chiptemp; //TODO OVE test only
+
 uint8_t j = 0;      //fake buffer TODO remove
 
 /*utility*/
@@ -98,6 +107,9 @@ void printSYSCLK(void){
 /*
 *  PERIPHERIAL FUNCTIONS 
 */ 
+void init_uart(void){
+    main_pc.baud(115200);
+}
 void init_servos(void){
 	Probe_height_32_bit[0] = *((uint32_t*)&probe_lift_home);
     Brush_height_32_bit[0] = *((uint32_t*)&brush_lift_home);
@@ -122,28 +134,37 @@ void init_outputs(void){
     fan = 0;
 }
 void init_thermal(void){
-    main_pc.baud(115200);
-
-    for(int i =0;i<19;i++){
-        therm_buffer[i] = i+j;
-    }
+    
+    //tmp_fwd.read_chip_temp();
+    //tmp_bwd.read_chip_temp();
 }
 
 void thermal_measurement_fun(void){
     if(Thermal_enable_8_Bit[0]){
-        printf("[");
-        for(int i =0;i<19;i++){
-            therm_buffer[i] = i+j;
-            printf("%u ", therm_buffer[i]);
+    //// test only
+    
+        tmp_fwd.read_float_data(floatbuff);
+        chiptemp = tmp_fwd.read_chip_temp();
+        tmp_fwd.get_raw_buffer(raw_buff_fwd);
+        #if DEBUG_PRINT
+        printf("ptat: %.1f temp: [",chiptemp);
+        for(int i=0;i<8;i++){
+            printf("%.1f, ",floatbuff[i]);
         }
         printf("]\n");
-        j++;
-        j = j%19;
+        #endif
+        
+    
+        /// final implem
+        //tmp_fwd.read_raw_buffer(raw_buff_fwd); //TBD
+        //tmp_bwd.read_raw_buffer(raw_buff_bwd); //TBD
+    
         serial_buffer[0] = 0xFF;
         serial_buffer[1] = 0xFF;
-        for(int i =0; i<19;i++) serial_buffer[2+i] =therm_buffer[i];
+        for(int i =0; i<19;i++) serial_buffer[2+i] =raw_buff_fwd[i];
+        //for(int i =0; i<19;i++) serial_buffer[21+i] =raw_buff_bwd[i]; //TBD
         main_pc.write(serial_buffer,21,(const event_callback_t)NULL);
-        //printf("Thermal data demo [  ] \n");
+   
     }
 }
 
@@ -155,10 +176,11 @@ unsigned char servos_handler(CO_Data* d){
     float brush_hgt_sp = *((float*)&Brush_height_32_bit[0]);
     float brush_spd_sp = *((float*)&Brush_speed_32_bit[0]);
     
-    if(probe_hgt_sp != old_probe_hgt_sp) printf("Probe lift= %f\n",probe_hgt_sp); //TODO remove
-    if(brush_hgt_sp != old_brush_hgt_sp) printf("Brush lift= %f\n",brush_hgt_sp); //TODO remove
-    if(brush_spd_sp != old_brush_spd_sp) printf("Brush speed= %f\n",brush_spd_sp); //TODO remove
-    
+    #if DEBUG_PRINT
+        if(probe_hgt_sp != old_probe_hgt_sp) printf("Probe lift= %f\n",probe_hgt_sp); //TODO remove
+        if(brush_hgt_sp != old_brush_hgt_sp) printf("Brush lift= %f\n",brush_hgt_sp); //TODO remove
+        if(brush_spd_sp != old_brush_spd_sp) printf("Brush speed= %f\n",brush_spd_sp); //TODO remove
+    #endif
     old_probe_hgt_sp = probe_hgt_sp;  //TODO remove
     old_brush_hgt_sp = brush_hgt_sp;
     old_brush_spd_sp = brush_spd_sp; 
@@ -176,10 +198,11 @@ unsigned char outputs_handler(CO_Data* d){
     uint8_t led_sp = Led_state_8_Bit[0];
     uint8_t laser_sp = Laser_state_8_Bit[0];
     uint8_t fan_sp = Fan_state_8_Bit[0];
-
-    if(old_led_sp != led_sp) printf("Light= %u\n",led_sp); //TODO remove
-    if(old_laser_sp != laser_sp) printf("Laser= %u\n",laser_sp); //TODO remove
-    if(old_fan_sp != fan_sp) printf("Fan= %u\n",fan_sp); //TODO remove
+    #if DEBUG_PRINT
+        if(old_led_sp != led_sp) printf("Light= %u\n",led_sp); //TODO remove
+        if(old_laser_sp != laser_sp) printf("Laser= %u\n",laser_sp); //TODO remove
+        if(old_fan_sp != fan_sp) printf("Fan= %u\n",fan_sp); //TODO remove
+    #endif
     old_led_sp = led_sp;   //TODO remove
     old_laser_sp = laser_sp;
     old_fan_sp = fan_sp;
@@ -192,11 +215,12 @@ unsigned char outputs_handler(CO_Data* d){
 }
 unsigned char thermal_handler(CO_Data* d){     //TODO remove , basta vedere in measurement_fun la variabile
     uint8_t thermal_ena = Thermal_enable_8_Bit[0];
-
-    if(old_thermal_ena != thermal_ena){ //TODO remove
-        if(thermal_ena) printf("Thermal=  enabled\n");
-        else printf("Thermal=  disabled\n");
-    }
+    #if DEBUG_PRINT
+        if(old_thermal_ena != thermal_ena){ //TODO remove
+            if(thermal_ena) printf("Thermal=  enabled\n");
+            else printf("Thermal=  disabled\n");
+        }
+    #endif
     old_thermal_ena = thermal_ena; //TODO remove
     return 1;
 }

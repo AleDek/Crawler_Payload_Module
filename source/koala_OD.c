@@ -717,8 +717,8 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
                      {
                        { RO, uint8, sizeof (UNS8), (void*)&mbed_slave_highestSubIndex_obj6202 },
                        { RW, uint32, sizeof (UNS32), (void*)&Probe_height_32_bit[0] },
-                       { RW, uint32, sizeof (UNS32), (void*)&Brush_speed_32_bit[0] },
-                       { RW, uint32, sizeof (UNS32), (void*)&Brush_height_32_bit[0] }
+                       { RW, uint32, sizeof (UNS32), (void*)&Brush_height_32_bit[0] },
+                       { RW, uint32, sizeof (UNS32), (void*)&Brush_speed_32_bit[0] }
                      };
 
 /* index 0x6206 :   Mapped variable Error Mode Outputs 8 Bit 

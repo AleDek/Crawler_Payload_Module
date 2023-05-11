@@ -29,9 +29,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "canfestival.h"
 #include "canopen_timer.h"
 #include "koala_OD.h"
+#include "D6T_8L_09.h"
 #include "mbed.h"
-#include "Servo.h"
 
+void init_uart(void);
 
 void init_servos(void);
 void init_outputs(void);
